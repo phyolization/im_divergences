@@ -21,7 +21,7 @@ def cond_ent(joint, marg):
 
 	return hab - hb
 
-def score_constraints(sys, Aops, Bops, eta=1.0, v=1.0):
+def score_constraints(sys, Aops, Bops, eta=1.0, v=1):
 	"""
 	Returns a list of moment equalities for a two-qubit system
 					cos(theta) |00> + sin(theta) |11>
@@ -37,7 +37,10 @@ def score_constraints(sys, Aops, Bops, eta=1.0, v=1.0):
 
 	[id, sx, sy, sz] = [qtp.qeye(2), qtp.sigmax(), qtp.sigmay(), qtp.sigmaz()]
 	[theta, a0, a1, b0, b1, b2] = sys[:]
-	rho = v * (cos(theta)*qtp.ket('00') + sin(theta)*qtp.ket('11')).proj() + (1-v) * qtp.qeye(4)
+	rho = v * (cos(theta)*qtp.ket('00') + sin(theta)*qtp.ket('11')).proj()
+	isonoise = qtp.maximally_mixed_dm(4)
+	isonoise.dims = [2,2],[2,2]
+	rho += (1-v) * isonoise
 
 	# Define the first projectors for each of the measurements of Alice and Bob
 	a00 = 0.5*(id + cos(a0)*sz + sin(a0)*sx)
