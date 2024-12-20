@@ -44,6 +44,8 @@ def score_constraints(sys, Aops, Bops, eta=1.0, v=1.0):
 	a01 = id - a00
 	a10 = 0.5*(id + cos(a1)*sz + sin(a1)*sx)
 	a11 = id - a10
+	a20 = 0.5*(id + cos(a1)*sz + sin(a1)*sx)
+	a21 = id - a20
 	b00 = 0.5*(id + cos(b0)*sz + sin(b0)*sx)
 	b01 = id - b00
 	b10 = 0.5*(id + cos(b1)*sz + sin(b1)*sx)
