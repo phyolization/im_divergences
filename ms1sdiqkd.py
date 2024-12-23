@@ -61,24 +61,14 @@ def score_constraints(sys, Aops, Bops, eta=1.0, v=1):
 
 	constraints = []
 
-	constraints += [Aops[0][0]*Bops[0][0] - (eta**2 * (rho*qtp.tensor(A_meas[0][0], B_meas[0][0])).tr().real + \
-				+ eta*(1-eta)*((rho*qtp.tensor(A_meas[0][0], id)).tr().real + (rho*qtp.tensor(id, B_meas[0][0])).tr().real) + \
-				+ (1-eta)*(1-eta))]
-	constraints += [Aops[0][0]*Bops[1][0] - (eta**2 * (rho*qtp.tensor(A_meas[0][0], B_meas[1][0])).tr().real + \
-				+ eta*(1-eta)*((rho*qtp.tensor(A_meas[0][0], id)).tr().real + (rho*qtp.tensor(id, B_meas[1][0])).tr().real) + \
-				+ (1-eta)*(1-eta))]
-	constraints += [Aops[1][0]*Bops[0][0] - (eta**2 * (rho*qtp.tensor(A_meas[1][0], B_meas[0][0])).tr().real + \
-				+ eta*(1-eta)*((rho*qtp.tensor(A_meas[1][0], id)).tr().real + (rho*qtp.tensor(id, B_meas[0][0])).tr().real) + \
-				+ (1-eta)*(1-eta))]
-	constraints += [Aops[1][0]*Bops[1][0] - (eta**2 * (rho*qtp.tensor(A_meas[1][0], B_meas[1][0])).tr().real + \
-				+ eta*(1-eta)*((rho*qtp.tensor(A_meas[1][0], id)).tr().real + (rho*qtp.tensor(id, B_meas[1][0])).tr().real) + \
-				+ (1-eta)*(1-eta))]
-
-	constraints += [Aops[0][0] - eta * (rho*qtp.tensor(A_meas[0][0], id)).tr().real - (1-eta)]
-	constraints += [Bops[0][0] - eta * (rho*qtp.tensor(id, B_meas[0][0])).tr().real - (1-eta)]
-	constraints += [Aops[1][0] - eta * (rho*qtp.tensor(A_meas[1][0], id)).tr().real - (1-eta)]
-	constraints += [Bops[1][0] - eta * (rho*qtp.tensor(id, B_meas[1][0])).tr().real - (1-eta)]
-
+	for a in [0,1,2]:
+		constraints += [Aops[a][0] - eta * (rho*qtp.tensor(A_meas[a][0], id)).tr().real - (1-eta)]
+		constraints += [Bops[a][0] - eta * (rho*qtp.tensor(id, B_meas[a][0])).tr().real - (1-eta)]
+		for b in  [0,1,2]:
+			constraints += [Aops[a][0]*Bops[b][0] - (eta**2 * (rho*qtp.tensor(A_meas[a][0], B_meas[b][0])).tr().real + \
+						+ eta*(1-eta)*(rho*qtp.tensor(A_meas[a][0], id)).tr().real + (rho*qtp.tensor(id, B_meas[b][0])).tr().real + \
+						+ (1-eta)*(1-eta))]
+	
 	return constraints[:]
 
 def HAgB(sys, eta):
@@ -195,56 +185,59 @@ substitutions.update(ncp.projective_measurement_constraints(A,B))
 # Defining a system to generate a conditional distribution
 # We pick the system that maximizes the chsh score
 test_sys = [pi/4, 0.0, pi/2, pi/4, -pi/4, 0.0]
-test_eta = 0.999
+test_eta = [.99]
 # Get the monomial constraints
-score_cons = score_constraints(test_sys, A, B, test_eta)
+for test_eta in test_eta:
+	score_cons = score_constraints(test_sys, A, B, test_eta)
+	# CONDITIONS on V1 and V2
+	# Commute with all Alice and Bob operators
+	for v in V1 + V2:
+		for Ax in A:
+			for a in Ax:
+				substitutions.update({v*a : a*v})
+				substitutions.update({Dagger(v)*a : a*Dagger(v)})
+		for By in B:
+			for b in By:
+				substitutions.update({v*b : b*v})
+				substitutions.update({Dagger(v)*b : b*Dagger(v)})
 
-# CONDITIONS on V1 and V2
-# Commute with all Alice and Bob operators
-for v in V1 + V2:
-	for Ax in A:
-		for a in Ax:
-			substitutions.update({v*a : a*v})
-			substitutions.update({Dagger(v)*a : a*Dagger(v)})
-	for By in B:
-		for b in By:
-			substitutions.update({v*b : b*v})
-			substitutions.update({Dagger(v)*b : b*Dagger(v)})
+	# V_2^* V_2 <= I
+	operator_ineqs += [1 - (Dagger(V2[0])*V2[0] + Dagger(V2[1])*V2[1])]
+	# V_2 + V_2^* >= 2 V_1^* V_1
+	operator_ineqs += [V2[0] + Dagger(V2[0]) - 2*Dagger(V1[0])*V1[0]]
+	operator_ineqs += [V2[1] + Dagger(V2[1]) - 2*Dagger(V1[1])*V1[1]]
 
-# V_2^* V_2 <= I
-operator_ineqs += [1 - (Dagger(V2[0])*V2[0] + Dagger(V2[1])*V2[1])]
-# V_2 + V_2^* >= 2 V_1^* V_1
-operator_ineqs += [V2[0] + Dagger(V2[0]) - 2*Dagger(V1[0])*V1[0]]
-operator_ineqs += [V2[1] + Dagger(V2[1]) - 2*Dagger(V1[1])*V1[1]]
+	moment_equalities = moment_eqs[:] + score_cons[:]
+	moment_inequalities = moment_ineqs[:]
+	operator_equalities = operator_eqs[:]
+	operator_inequalities = operator_ineqs[:]
 
-moment_equalities = moment_eqs[:] + score_cons[:]
-moment_inequalities = moment_ineqs[:]
-operator_equalities = operator_eqs[:]
-operator_inequalities = operator_ineqs[:]
+	# We include some extra monomials in the relaxation to boost rates
+	extra_monos = []
+	for v in V1 + V2:
+		for Ax in A:
+			for a in Ax:
+				for By in B:
+					for b in By:
+						extra_monos += [a*b*v]
+						extra_monos += [a*b*Dagger(v)]
 
-# We include some extra monomials in the relaxation to boost rates
-extra_monos = []
-for v in V1 + V2:
-	for Ax in A:
-		for a in Ax:
-			for By in B:
-				for b in By:
-					extra_monos += [a*b*v]
-					extra_monos += [a*b*Dagger(v)]
+	# Objective function
+	obj = A[0][0]*(V1[0] + Dagger(V1[0]))/2.0 + A[0][1]*(V1[1] + Dagger(V1[1]))/2.0
 
-# Objective function
-obj = A[0][0]*(V1[0] + Dagger(V1[0]))/2.0 + A[0][1]*(V1[1] + Dagger(V1[1]))/2.0
+	ops = ncp.flatten([A,B,V1,V2])
+	sdp = ncp.SdpRelaxation(ops, verbose = 1, normalized=True, parallel=0)
+	sdp.get_relaxation(level = LEVEL,
+						equalities = operator_equalities,
+						inequalities = operator_inequalities,
+						momentequalities = moment_equalities,
+						momentinequalities = moment_inequalities,
+						objective = -obj,
+						substitutions = substitutions,
+						extramonomials = extra_monos)
 
-ops = ncp.flatten([A,B,V1,V2])
-sdp = ncp.SdpRelaxation(ops, verbose = 1, normalized=True, parallel=0)
-sdp.get_relaxation(level = LEVEL,
-					equalities = operator_equalities,
-					inequalities = operator_inequalities,
-					momentequalities = moment_equalities,
-					momentinequalities = moment_inequalities,
-					objective = -obj,
-					substitutions = substitutions,
-					extramonomials = extra_monos)
+	sdp.solve('mosek')
 
-sdp.solve('mosek')
-print(f"For detection efficiency {test_eta} the system {test_sys} achieves a DI-QKD rate of {rate(sdp,test_sys,test_eta)}")
+	print(f"For detection efficiency {test_eta} the system {test_sys} achieves a DI-QKD rate of {rate(sdp,test_sys,test_eta)}")
+
+# print(f"For detection efficiency {test_eta} the system {test_sys} achieves a DI-QKD rate of {rate(sdp,test_sys,test_eta)}")
