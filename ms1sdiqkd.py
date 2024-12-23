@@ -47,15 +47,17 @@ def score_constraints(sys, Aops, Bops, eta=1.0, v=1):
 	a01 = id - a00
 	a10 = 0.5*(id + cos(a1)*sz + sin(a1)*sx)
 	a11 = id - a10
-	a20 = 0.5*(id + cos(a1)*sz + sin(a1)*sx)
+	a20 = 0.5*(id + cos(a1)*sz + sin(a1)*sy)
 	a21 = id - a20
 	b00 = 0.5*(id + cos(b0)*sz + sin(b0)*sx)
 	b01 = id - b00
 	b10 = 0.5*(id + cos(b1)*sz + sin(b1)*sx)
 	b11 = id - b10
+	b20 = 0.5*(id + cos(b1)*sz + sin(b1)*sy)
+	b21 = id - b20
 
-	A_meas = [[a00, a01], [a10, a11]]
-	B_meas = [[b00, b01], [b10, b11]]
+	A_meas = [[a00, a01], [a10, a11], [a20, a21]]
+	B_meas = [[b00, b01], [b10, b11], [b20, b21]]
 
 	constraints = []
 
@@ -193,7 +195,7 @@ substitutions.update(ncp.projective_measurement_constraints(A,B))
 # Defining a system to generate a conditional distribution
 # We pick the system that maximizes the chsh score
 test_sys = [pi/4, 0.0, pi/2, pi/4, -pi/4, 0.0]
-test_eta = 0.99
+test_eta = 0.999
 # Get the monomial constraints
 score_cons = score_constraints(test_sys, A, B, test_eta)
 
