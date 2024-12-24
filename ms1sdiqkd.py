@@ -34,6 +34,7 @@ def score_constraints(sys, Aops, Bops, eta=1.0, v=1):
 	This system is subject to detectors with efficiency eta and we treat no-clicks
 	as the outcome 0.
 	"""
+	eta_B=1
 
 	[id, sx, sy, sz] = [qtp.qeye(2), qtp.sigmax(), qtp.sigmay(), qtp.sigmaz()]
 	[theta, a0, a1, b0, b1, b2] = sys[:]
@@ -61,13 +62,14 @@ def score_constraints(sys, Aops, Bops, eta=1.0, v=1):
 
 	constraints = []
 
-	for a in [0,1,2]:
+	for a in [0,1]:
 		constraints += [Aops[a][0] - eta * (rho*qtp.tensor(A_meas[a][0], id)).tr().real - (1-eta)]
 		constraints += [Bops[a][0] - eta * (rho*qtp.tensor(id, B_meas[a][0])).tr().real - (1-eta)]
-		for b in  [0,1,2]:
-			constraints += [Aops[a][0]*Bops[b][0] - (eta**2 * (rho*qtp.tensor(A_meas[a][0], B_meas[b][0])).tr().real + \
-						+ eta*(1-eta)*(rho*qtp.tensor(A_meas[a][0], id)).tr().real + (rho*qtp.tensor(id, B_meas[b][0])).tr().real + \
-						+ (1-eta)*(1-eta))]
+		for b in  [0,1]:
+			constraints += [Aops[a][0]*Bops[b][0] - (eta*eta_B * (rho*qtp.tensor(A_meas[a][0], B_meas[b][0])).tr().real + \
+						+ eta*(1-eta_B)*(rho*qtp.tensor(A_meas[a][0], id)).tr().real + \
+						+	eta_B*(1-eta)*(rho*qtp.tensor(id, B_meas[b][0])).tr().real + \
+						+ (1-eta)*(1-eta_B))]
 	
 	return constraints[:]
 
@@ -79,6 +81,8 @@ def HAgB(sys, eta):
 	[id, sx, sy, sz] = [qtp.qeye(2), qtp.sigmax(), qtp.sigmay(), qtp.sigmaz()]
 	[theta, a0, a1, b0, b1, b2] = sys[:]
 	rho = (cos(theta)*qtp.ket('00') + sin(theta)*qtp.ket('11')).proj()
+
+	eta_B=1
 
 	# Define the first projectors for each of the measurements of Alice and Bob
 	a00 = 0.5*(id + cos(a0)*sz + sin(a0)*sx)
@@ -96,15 +100,15 @@ def HAgB(sys, eta):
 	B_meas = [[b00, b01], [b10, b11], [b20,b21]]
 
 	# Complete no bin distribution
-	q00 = eta**2 * (rho*qtp.tensor(A_meas[0][0], B_meas[2][0])).tr().real
-	q01 = eta**2 * (rho*qtp.tensor(A_meas[0][0], B_meas[2][1])).tr().real
-	q02 = eta * (1-eta) * (rho*qtp.tensor(A_meas[0][0], id)).tr().real
-	q10 = eta**2 * (rho*qtp.tensor(A_meas[0][1], B_meas[2][0])).tr().real
-	q11 = eta**2 * (rho*qtp.tensor(A_meas[0][1], B_meas[2][1])).tr().real
-	q12 = eta * (1-eta) * (rho*qtp.tensor(A_meas[0][1], id)).tr().real
-	q20 = eta * (1-eta) * (rho*qtp.tensor(id, B_meas[2][0])).tr().real
-	q21 = eta * (1-eta) * (rho*qtp.tensor(id, B_meas[2][1])).tr().real
-	q22 = (1-eta)**2
+	q00 = eta*eta_B * (rho*qtp.tensor(A_meas[0][0], B_meas[2][0])).tr().real
+	q01 = eta*eta_B * (rho*qtp.tensor(A_meas[0][0], B_meas[2][1])).tr().real
+	q02 = eta * (1-eta_B) * (rho*qtp.tensor(A_meas[0][0], id)).tr().real
+	q10 = eta*eta_B * (rho*qtp.tensor(A_meas[0][1], B_meas[2][0])).tr().real
+	q11 = eta*eta_B * (rho*qtp.tensor(A_meas[0][1], B_meas[2][1])).tr().real
+	q12 = eta * (1-eta_B) * (rho*qtp.tensor(A_meas[0][1], id)).tr().real
+	q20 = eta_B * (1-eta) * (rho*qtp.tensor(id, B_meas[2][0])).tr().real
+	q21 = eta_B * (1-eta) * (rho*qtp.tensor(id, B_meas[2][1])).tr().real
+	q22 = (1-eta)*eta_B
 
 	# qjoint = [q00,q01,q02,q10,q11,q12,q20,q21,q22]
 	# qmarg = [q00 + q10 + q20, q01 + q11 + q21, q02, + q12 + q22]
@@ -124,14 +128,16 @@ def HAgB(sys, eta):
 
 	pmarg = [pb0, pb1, pb2]
 
-	# Alice and bob both bin
+	# Alice and Bob both bin
 	r00 = q00 + q20 + q02 + q22
 	r01 = q01 + q21
 	r10 = q10 + q12
 	r11 = q11
 	rjoint = [r00, r01, r10, r11]
+
 	rb0 = r00 + r10
 	rb1 = r01 + r11
+
 	rmarg = [rb0, rb1]
 
 	hagb_abin = cond_ent(pjoint,pmarg)
@@ -185,7 +191,7 @@ substitutions.update(ncp.projective_measurement_constraints(A,B))
 # Defining a system to generate a conditional distribution
 # We pick the system that maximizes the chsh score
 test_sys = [pi/4, 0.0, pi/2, pi/4, -pi/4, 0.0]
-test_eta = [.99]
+test_eta = [.9]
 # Get the monomial constraints
 for test_eta in test_eta:
 	score_cons = score_constraints(test_sys, A, B, test_eta)
