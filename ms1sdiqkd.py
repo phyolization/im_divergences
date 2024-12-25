@@ -34,10 +34,15 @@ def score_constraints(sys, Aops, Bops, eta=1.0, v=1):
 	This system is subject to detectors with efficiency eta and we treat no-clicks
 	as the outcome 0.
 	"""
-	eta_B=1
+
+	"""
+	!!Add a new paramter v referring to the visibility of the maximally entangled state!!
+	"""
+	
+	eta_B = eta			# !!eta can be replaced with unity to mimick the 1sDI setting!!
 
 	[id, sx, sy, sz] = [qtp.qeye(2), qtp.sigmax(), qtp.sigmay(), qtp.sigmaz()]
-	[theta, a0, a1, b0, b1, b2] = sys[:]
+	[theta, a0, a1, b0, b1, b2, a2] = sys[:]
 	rho = v * (cos(theta)*qtp.ket('00') + sin(theta)*qtp.ket('11')).proj()
 	isonoise = qtp.maximally_mixed_dm(4)
 	isonoise.dims = [2,2],[2,2]
@@ -48,13 +53,13 @@ def score_constraints(sys, Aops, Bops, eta=1.0, v=1):
 	a01 = id - a00
 	a10 = 0.5*(id + cos(a1)*sz + sin(a1)*sx)
 	a11 = id - a10
-	a20 = 0.5*(id + cos(a1)*sz + sin(a1)*sy)
+	a20 = 0.5*(id + cos(a2)*sz + sin(a2)*sy)
 	a21 = id - a20
 	b00 = 0.5*(id + cos(b0)*sz + sin(b0)*sx)
 	b01 = id - b00
 	b10 = 0.5*(id + cos(b1)*sz + sin(b1)*sx)
 	b11 = id - b10
-	b20 = 0.5*(id + cos(b1)*sz + sin(b1)*sy)
+	b20 = 0.5*(id + cos(b2)*sz + sin(b2)*sy)
 	b21 = id - b20
 
 	A_meas = [[a00, a01], [a10, a11], [a20, a21]]
@@ -62,10 +67,13 @@ def score_constraints(sys, Aops, Bops, eta=1.0, v=1):
 
 	constraints = []
 
-	for a in [0,1]:
+	"""
+	!!rephrase the constraints using for-loop to adapt to multisetting case!!
+	"""
+	for a in [0,1,2]:
 		constraints += [Aops[a][0] - eta * (rho*qtp.tensor(A_meas[a][0], id)).tr().real - (1-eta)]
 		constraints += [Bops[a][0] - eta * (rho*qtp.tensor(id, B_meas[a][0])).tr().real - (1-eta)]
-		for b in  [0,1]:
+		for b in  [0,1,2]:
 			constraints += [Aops[a][0]*Bops[b][0] - (eta*eta_B * (rho*qtp.tensor(A_meas[a][0], B_meas[b][0])).tr().real + \
 						+ eta*(1-eta_B)*(rho*qtp.tensor(A_meas[a][0], id)).tr().real + \
 						+	eta_B*(1-eta)*(rho*qtp.tensor(id, B_meas[b][0])).tr().real + \
@@ -79,10 +87,10 @@ def HAgB(sys, eta):
 	for explanation of sys)	and given detection	efficiency eta.
 	"""
 	[id, sx, sy, sz] = [qtp.qeye(2), qtp.sigmax(), qtp.sigmay(), qtp.sigmaz()]
-	[theta, a0, a1, b0, b1, b2] = sys[:]
+	[theta, a0, a1, b0, b1, b2, a2] = sys[:]
 	rho = (cos(theta)*qtp.ket('00') + sin(theta)*qtp.ket('11')).proj()
 
-	eta_B=1
+	eta_B = eta			# !!eta can be replaced with unity to mimick the 1sDI setting!!
 
 	# Define the first projectors for each of the measurements of Alice and Bob
 	a00 = 0.5*(id + cos(a0)*sz + sin(a0)*sx)
@@ -108,7 +116,7 @@ def HAgB(sys, eta):
 	q12 = eta * (1-eta_B) * (rho*qtp.tensor(A_meas[0][1], id)).tr().real
 	q20 = eta_B * (1-eta) * (rho*qtp.tensor(id, B_meas[2][0])).tr().real
 	q21 = eta_B * (1-eta) * (rho*qtp.tensor(id, B_meas[2][1])).tr().real
-	q22 = (1-eta)*eta_B
+	q22 = (1-eta)*(1-eta_B)
 
 	# qjoint = [q00,q01,q02,q10,q11,q12,q20,q21,q22]
 	# qmarg = [q00 + q10 + q20, q01 + q11 + q21, q02, + q12 + q22]
@@ -165,8 +173,8 @@ LEVEL = 2
 # relations are enforced.
 # We also don't need to specify Bobs third input as we can lower bound H(A|E)
 # using only the measurements on inputs {0,1}
-A_config = [3,2]
-B_config = [2,2]
+A_config = [3,2,2]		# !!enlarged the size of configuration!!
+B_config = [2,2,2]
 
 # Measurement operators
 A = [Ai for Ai in ncp.generate_measurements(A_config, 'A')]
@@ -190,8 +198,8 @@ substitutions.update(ncp.projective_measurement_constraints(A,B))
 
 # Defining a system to generate a conditional distribution
 # We pick the system that maximizes the chsh score
-test_sys = [pi/4, 0.0, pi/2, pi/4, -pi/4, 0.0]
-test_eta = [.9]
+test_sys = [pi/4, 0.0, pi/2, pi/4, -pi/4, 0.0, pi/2]
+test_eta = [.9, .91, .92, .93, .94]
 # Get the monomial constraints
 for test_eta in test_eta:
 	score_cons = score_constraints(test_sys, A, B, test_eta)
@@ -232,7 +240,7 @@ for test_eta in test_eta:
 	obj = A[0][0]*(V1[0] + Dagger(V1[0]))/2.0 + A[0][1]*(V1[1] + Dagger(V1[1]))/2.0
 
 	ops = ncp.flatten([A,B,V1,V2])
-	sdp = ncp.SdpRelaxation(ops, verbose = 1, normalized=True, parallel=0)
+	sdp = ncp.SdpRelaxation(ops, verbose = 0, normalized=True, parallel=0)
 	sdp.get_relaxation(level = LEVEL,
 						equalities = operator_equalities,
 						inequalities = operator_inequalities,
